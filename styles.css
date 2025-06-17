@@ -238,6 +238,161 @@ body {
     transition: filter 0.3s ease;
 }
 
+/* Session Management Styles */
+.session-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 15px;
+    border: 2px solid #e2e8f0;
+}
+
+.session-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+.session-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.session-input {
+    padding: 10px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    background: white;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    min-width: 200px;
+}
+
+.session-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-session {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    background: #667eea;
+    color: white;
+}
+
+.btn-session:hover {
+    background: #5a67d8;
+    transform: translateY(-1px);
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 20px;
+    background: #f0fff4;
+    border: 2px solid #68d391;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.session-status {
+    color: #38a169;
+}
+
+.online-users {
+    color: #4299e1;
+}
+
+.btn-copy {
+    background: none;
+    border: 1px solid #68d391;
+    color: #38a169;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+}
+
+.btn-copy:hover {
+    background: #68d391;
+    color: white;
+}
+
+/* Online indicator */
+.online-indicator {
+    position: relative;
+    display: inline-block;
+}
+
+.online-indicator::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #48bb78;
+    border-radius: 50%;
+    border: 2px solid white;
+    animation: pulse 2s infinite;
+}
+
+/* Collaboration indicators */
+.item-collaborator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background: #667eea;
+    color: white;
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid white;
+}
+
+.item-editing {
+    border: 2px solid #ffd700 !important;
+    background: #fffbf0 !important;
+    position: relative;
+}
+
+.item-editing::after {
+    content: '✏️ Being edited...';
+    position: absolute;
+    top: -8px;
+    left: 10px;
+    background: #ffd700;
+    color: #744210;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
 .retrospective-board {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -666,6 +821,22 @@ body {
     
     .time-remaining {
         font-size: 2.5rem;
+    }
+    
+    .session-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .session-input {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .session-info {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
     }
     
     .team-input {

@@ -24,6 +24,16 @@ let timerState = {
 // Reveal state
 let isTextHidden = false;
 
+// Collaboration state
+let collaborationState = {
+    isConnected: false,
+    currentSessionId: null,
+    database: null,
+    userId: generateUserId(),
+    onlineUsers: {},
+    isHost: false
+};
+
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
     loadRetroData();
@@ -651,4 +661,292 @@ window.addEventListener('load', function() {
     setTimeout(() => {
         document.body.style.opacity = '1';
     }, 100);
+    
+    // Initialize collaboration
+    initializeCollaboration();
 });
+
+// ===== COLLABORATION FUNCTIONS =====
+
+// Generate unique user ID
+function generateUserId() {
+    return 'user_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Initialize collaboration features
+function initializeCollaboration() {
+    try {
+        collaborationState.database = initializeFirebase();
+        if (collaborationState.database) {
+            console.log('Collaboration features enabled');
+        } else {
+            console.log('Running in offline mode');
+        }
+    } catch (error) {
+        console.warn('Collaboration initialization failed:', error);
+    }
+    
+    // Add session input event listener
+    document.getElementById('sessionId').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') joinSession();
+    });
+}
+
+// Create new session
+function createSession() {
+    if (!collaborationState.database) {
+        showNotification('Collaboration not available - running offline', 'warning');
+        return;
+    }
+    
+    const sessionId = generateSessionId();
+    collaborationState.currentSessionId = sessionId;
+    collaborationState.isHost = true;
+    
+    setupSession(sessionId);
+    showNotification('Session created! Share ID: ' + sessionId, 'success');
+}
+
+// Join existing session
+function joinSession() {
+    if (!collaborationState.database) {
+        showNotification('Collaboration not available - running offline', 'warning');
+        return;
+    }
+    
+    const sessionId = document.getElementById('sessionId').value.trim();
+    if (!sessionId) {
+        showNotification('Please enter a session ID', 'error');
+        return;
+    }
+    
+    collaborationState.currentSessionId = sessionId;
+    collaborationState.isHost = false;
+    
+    // Check if session exists
+    collaborationState.database.ref(`sessions/${sessionId}`).once('value')
+        .then(snapshot => {
+            if (snapshot.exists()) {
+                setupSession(sessionId);
+                loadSharedData();
+                showNotification('Joined session successfully!', 'success');
+            } else {
+                showNotification('Session not found', 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to join session', 'error');
+            console.error(error);
+        });
+}
+
+// Setup session listeners
+function setupSession(sessionId) {
+    collaborationState.isConnected = true;
+    
+    // Update UI
+    document.getElementById('sessionInfo').style.display = 'flex';
+    document.getElementById('currentSessionId').textContent = sessionId;
+    
+    // Setup real-time listeners
+    setupDataSynchronization();
+    setupUserPresence();
+    
+    // Save session data
+    if (collaborationState.isHost) {
+        saveSharedData();
+    }
+}
+
+// Setup real-time data synchronization
+function setupDataSynchronization() {
+    const sessionRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/data`);
+    
+    // Listen for data changes
+    sessionRef.on('value', snapshot => {
+        if (snapshot.exists()) {
+            const sharedData = snapshot.val();
+            updateFromSharedData(sharedData);
+        }
+    });
+    
+    // Override save function to sync to Firebase
+    const originalSaveRetroData = saveRetroData;
+    saveRetroData = function() {
+        originalSaveRetroData();
+        if (collaborationState.isConnected) {
+            saveSharedData();
+        }
+    };
+}
+
+// Setup user presence tracking
+function setupUserPresence() {
+    const userRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/users/${collaborationState.userId}`);
+    const presenceRef = collaborationState.database.ref('.info/connected');
+    
+    presenceRef.on('value', snapshot => {
+        if (snapshot.val() === true) {
+            // User is online
+            userRef.set({
+                id: collaborationState.userId,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            
+            // Remove user when they disconnect
+            userRef.onDisconnect().remove();
+        }
+    });
+    
+    // Listen for online users
+    const usersRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/users`);
+    usersRef.on('value', snapshot => {
+        const users = snapshot.val() || {};
+        collaborationState.onlineUsers = users;
+        updateOnlineCount(Object.keys(users).length);
+    });
+}
+
+// Generate session ID
+function generateSessionId() {
+    return Math.random().toString(36).substr(2, 8).toUpperCase();
+}
+
+// Save data to Firebase
+function saveSharedData() {
+    if (!collaborationState.isConnected) return;
+    
+    const dataRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/data`);
+    dataRef.set({
+        retroData: retroData,
+        timerState: {
+            duration: timerState.duration,
+            remaining: timerState.remaining,
+            isRunning: timerState.isRunning,
+            isPaused: timerState.isPaused
+        },
+        isTextHidden: isTextHidden,
+        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    });
+}
+
+// Load shared data from Firebase
+function loadSharedData() {
+    if (!collaborationState.isConnected) return;
+    
+    const dataRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/data`);
+    dataRef.once('value')
+        .then(snapshot => {
+            if (snapshot.exists()) {
+                const sharedData = snapshot.val();
+                updateFromSharedData(sharedData);
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load shared data:', error);
+        });
+}
+
+// Update local data from shared data
+function updateFromSharedData(sharedData) {
+    if (!sharedData) return;
+    
+    // Update retrospective data
+    if (sharedData.retroData) {
+        retroData = { ...retroData, ...sharedData.retroData };
+        
+        // Update UI
+        document.getElementById('sprintName').value = retroData.sprintName || '';
+        document.getElementById('sprintDate').value = retroData.sprintDate || '';
+        
+        renderItems('well');
+        renderItems('improve');
+        renderItems('action');
+        renderTeamMembers();
+        updateAllCounts();
+    }
+    
+    // Update timer state
+    if (sharedData.timerState) {
+        timerState.duration = sharedData.timerState.duration;
+        timerState.remaining = sharedData.timerState.remaining;
+        document.getElementById('timerMinutes').value = timerState.duration;
+        updateTimerDisplay();
+    }
+    
+    // Update reveal state
+    if (typeof sharedData.isTextHidden === 'boolean') {
+        isTextHidden = sharedData.isTextHidden;
+        updateRevealUI();
+    }
+    
+    // Save to local storage
+    localStorage.setItem('retroData', JSON.stringify(retroData));
+}
+
+// Update online user count
+function updateOnlineCount(count) {
+    document.getElementById('onlineCount').textContent = count;
+}
+
+// Copy session ID to clipboard
+function copySessionId() {
+    if (!collaborationState.currentSessionId) return;
+    
+    navigator.clipboard.writeText(collaborationState.currentSessionId)
+        .then(() => {
+            showNotification('Session ID copied to clipboard!', 'success');
+        })
+        .catch(() => {
+            showNotification('Failed to copy session ID', 'error');
+        });
+}
+
+// Update reveal UI based on state
+function updateRevealUI() {
+    const toggleBtn = document.getElementById('revealToggle');
+    const columns = document.querySelectorAll('.column');
+    
+    if (isTextHidden) {
+        columns.forEach(column => column.classList.add('text-hidden'));
+        columns.forEach(column => column.classList.remove('text-revealed'));
+        toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Reveal All Text';
+    } else {
+        columns.forEach(column => column.classList.add('text-revealed'));
+        columns.forEach(column => column.classList.remove('text-hidden'));
+        toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide All Text';
+    }
+}
+
+// Override existing functions to include collaboration
+const originalAddItem = addItem;
+addItem = function(category) {
+    originalAddItem(category);
+    if (collaborationState.isConnected) {
+        saveSharedData();
+    }
+};
+
+const originalVoteItem = voteItem;
+voteItem = function(itemId, category) {
+    originalVoteItem(itemId, category);
+    if (collaborationState.isConnected) {
+        saveSharedData();
+    }
+};
+
+const originalDeleteItem = deleteItem;
+deleteItem = function(itemId, category) {
+    originalDeleteItem(itemId, category);
+    if (collaborationState.isConnected) {
+        saveSharedData();
+    }
+};
+
+const originalToggleReveal = toggleReveal;
+toggleReveal = function() {
+    originalToggleReveal();
+    if (collaborationState.isConnected) {
+        saveSharedData();
+    }
+};

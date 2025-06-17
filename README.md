@@ -51,6 +51,22 @@ A modern, interactive web application for conducting agile sprint retrospectives
 ### 🌐 Live Demo
 Visit the live app at: [Your deployed URL will go here]
 
+### 👥 **Multi-User Collaboration**
+This app supports real-time collaboration! Multiple team members can work on the same retrospective simultaneously.
+
+**Setup Firebase (Optional - for real-time collaboration):**
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project
+3. Enable Realtime Database
+4. Copy your config values to `firebase-config.js`
+5. Set database rules to allow read/write access
+
+**Using Collaboration:**
+- **Create Session:** Click "Create New" to start a collaborative session
+- **Join Session:** Enter a session ID and click "Join Session"
+- **Share:** Copy the session ID and share with team members
+- **Real-time Updates:** All changes sync automatically across all users
+
 ### Running the App Locally
 
 #### Option 1: Direct File Opening
@@ -113,12 +129,16 @@ npx http-server
 
 ```
 Retro_app/
-├── index.html          # Main HTML structure
-├── styles.css          # CSS styling and responsive design
-├── script.js           # JavaScript functionality
-├── README.md           # This documentation
+├── index.html              # Main HTML structure
+├── styles.css              # CSS styling and responsive design
+├── script.js               # JavaScript functionality
+├── firebase-config.js      # Firebase configuration for collaboration
+├── README.md               # This documentation
+├── FIREBASE_SETUP.md       # Detailed Firebase setup guide
+├── connect-github.sh       # GitHub deployment helper
+├── deploy-help.sh          # Deployment options guide
 └── .vscode/
-    └── tasks.json      # VS Code task configuration
+    └── tasks.json          # VS Code task configuration
 ```
 
 ## 🎯 Best Practices for Retrospectives

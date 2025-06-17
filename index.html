@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
 </head>
 <body>
     <div class="container">
@@ -48,6 +53,28 @@
                 <button class="btn-reveal" id="revealToggle" onclick="toggleReveal()">
                     <i class="fas fa-eye-slash"></i> Hide All Text
                 </button>
+            </div>
+
+            <!-- Session Management -->
+            <div class="session-section">
+                <div class="session-controls">
+                    <div class="session-input-group">
+                        <input type="text" id="sessionId" placeholder="Enter Session ID to join..." class="session-input">
+                        <button class="btn-session" id="joinSession" onclick="joinSession()">
+                            <i class="fas fa-users"></i> Join Session
+                        </button>
+                        <button class="btn-session" id="createSession" onclick="createSession()">
+                            <i class="fas fa-plus"></i> Create New
+                        </button>
+                    </div>
+                    <div class="session-info" id="sessionInfo" style="display: none;">
+                        <span class="session-status">Session: <strong id="currentSessionId"></strong></span>
+                        <span class="online-users">Online: <span id="onlineCount">1</span></span>
+                        <button class="btn-copy" onclick="copySessionId()" title="Copy Session ID">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
 
