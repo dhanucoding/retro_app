@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint Retrospective</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-sync-alt"></i> Sprint Retrospective</h1>
+            <div class="sprint-info">
+                <input type="text" id="sprintName" placeholder="Sprint Name (e.g., Sprint 23)" class="sprint-input">
+                <input type="date" id="sprintDate" class="date-input">
+            </div>
+            
+            <!-- Timer Section -->
+            <div class="timer-section">
+                <div class="timer-controls">
+                    <div class="timer-input-group">
+                        <label for="timerMinutes">Meeting Duration:</label>
+                        <input type="number" id="timerMinutes" min="1" max="180" value="30" class="timer-input">
+                        <span>minutes</span>
+                    </div>
+                    <div class="timer-buttons">
+                        <button class="btn-timer" id="startTimer" onclick="startTimer()">
+                            <i class="fas fa-play"></i> Start
+                        </button>
+                        <button class="btn-timer" id="pauseTimer" onclick="pauseTimer()" disabled>
+                            <i class="fas fa-pause"></i> Pause
+                        </button>
+                        <button class="btn-timer" id="resetTimer" onclick="resetTimer()">
+                            <i class="fas fa-stop"></i> Reset
+                        </button>
+                    </div>
+                </div>
+                <div class="timer-display">
+                    <div class="time-remaining" id="timeRemaining">30:00</div>
+                    <div class="timer-status" id="timerStatus">Ready to start</div>
+                </div>
+            </div>
+
+            <!-- Reveal Controls -->
+            <div class="reveal-section">
+                <button class="btn-reveal" id="revealToggle" onclick="toggleReveal()">
+                    <i class="fas fa-eye-slash"></i> Hide All Text
+                </button>
+            </div>
+        </header>
+
+        <div class="retrospective-board">
+            <!-- What Went Well Column -->
+            <div class="column went-well">
+                <div class="column-header">
+                    <h2><i class="fas fa-thumbs-up"></i> What Went Well</h2>
+                    <span class="item-count" id="wellCount">0</span>
+                </div>
+                <div class="add-item">
+                    <input type="text" placeholder="Add something that went well..." class="item-input" id="wellInput">
+                    <button class="add-btn" onclick="addItem('well')">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="items-container" id="wellItems"></div>
+            </div>
+
+            <!-- What Could Be Improved Column -->
+            <div class="column could-improve">
+                <div class="column-header">
+                    <h2><i class="fas fa-exclamation-triangle"></i> What Could Be Improved</h2>
+                    <span class="item-count" id="improveCount">0</span>
+                </div>
+                <div class="add-item">
+                    <input type="text" placeholder="Add something to improve..." class="item-input" id="improveInput">
+                    <button class="add-btn" onclick="addItem('improve')">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="items-container" id="improveItems"></div>
+            </div>
+
+            <!-- Action Items Column -->
+            <div class="column action-items">
+                <div class="column-header">
+                    <h2><i class="fas fa-tasks"></i> Action Items</h2>
+                    <span class="item-count" id="actionCount">0</span>
+                </div>
+                <div class="add-item">
+                    <input type="text" placeholder="Add an action item..." class="item-input" id="actionInput">
+                    <button class="add-btn" onclick="addItem('action')">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="items-container" id="actionItems"></div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="clearAll()">
+                <i class="fas fa-trash"></i> Clear All
+            </button>
+            <button class="btn btn-primary" onclick="exportRetro()">
+                <i class="fas fa-download"></i> Export Summary
+            </button>
+            <button class="btn btn-success" onclick="saveRetro()">
+                <i class="fas fa-save"></i> Save Retrospective
+            </button>
+        </div>
+
+        <!-- Team Members Section -->
+        <div class="team-section">
+            <h3><i class="fas fa-users"></i> Team Members</h3>
+            <div class="team-input">
+                <input type="text" placeholder="Add team member..." id="memberInput">
+                <button class="add-btn" onclick="addTeamMember()">
+                    <i class="fas fa-user-plus"></i>
+                </button>
+            </div>
+            <div class="team-members" id="teamMembers"></div>
+        </div>
+    </div>
+
+    <!-- Modal for item details -->
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3>Edit Item</h3>
+            <textarea id="modalText" placeholder="Enter details..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveItemEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
