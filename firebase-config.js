@@ -3,13 +3,13 @@
 const firebaseConfig = {
     // You'll need to create a Firebase project and get these values
     // Instructions are in the README.md
-    apiKey: "your-api-key-here",
-    authDomain: "your-project.firebaseapp.com",
-    databaseURL: "https://your-project-default-rtdb.firebaseio.com/",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "your-app-id"
+    apiKey: "AIzaSyBL-lypxxjynzLzH01eFX3nX9_yKKtiRRM",
+     authDomain: "retro-app-fire-db.firebaseapp.com",
+    databaseURL: "https://retro-app-fire-db-default-rtdb.firebaseio.com",
+    projectId: "retro-app-fire-db",
+    storageBucket: "retro-app-fire-db.firebasestorage.app",
+    messagingSenderId: "842943406260",
+    appId: "1:842943406260:web:d67ea9aa7be3c47066b7e1" 
 };
 
 // Initialize Firebase (this will be called from script.js)

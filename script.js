@@ -31,7 +31,9 @@ let collaborationState = {
     database: null,
     userId: generateUserId(),
     onlineUsers: {},
-    isHost: false
+    isHost: false,
+    timerRef: null,
+    serverTimeOffset: 0
 };
 
 // Initialize the app
@@ -495,6 +497,12 @@ document.addEventListener('keydown', function(e) {
 
 // Timer Functions
 function startTimer() {
+    // In collaborative sessions, only host can control timer
+    if (collaborationState.isConnected && !collaborationState.isHost) {
+        showNotification('Only the session host can control the timer', 'warning');
+        return;
+    }
+    
     const minutesInput = document.getElementById('timerMinutes');
     const startBtn = document.getElementById('startTimer');
     const pauseBtn = document.getElementById('pauseTimer');
@@ -515,19 +523,24 @@ function startTimer() {
     
     statusElement.textContent = 'Timer running...';
     
-    timerState.interval = setInterval(() => {
-        timerState.remaining--;
-        updateTimerDisplay();
-        
-        if (timerState.remaining <= 0) {
-            timerEnded();
-        }
-    }, 1000);
+    // For collaborative sessions, sync timer start with server timestamp
+    if (collaborationState.isConnected) {
+        syncTimerStart();
+    } else {
+        // Local timer
+        startLocalTimer();
+    }
     
     showNotification('Timer started!', 'success');
 }
 
 function pauseTimer() {
+    // In collaborative sessions, only host can control timer
+    if (collaborationState.isConnected && !collaborationState.isHost) {
+        showNotification('Only the session host can control the timer', 'warning');
+        return;
+    }
+    
     if (!timerState.isRunning) return;
     
     timerState.isRunning = false;
@@ -543,10 +556,21 @@ function pauseTimer() {
     pauseBtn.disabled = true;
     statusElement.textContent = 'Timer paused';
     
+    // Sync timer pause
+    if (collaborationState.isConnected) {
+        syncTimerPause();
+    }
+    
     showNotification('Timer paused', 'info');
 }
 
 function resetTimer() {
+    // In collaborative sessions, only host can control timer
+    if (collaborationState.isConnected && !collaborationState.isHost) {
+        showNotification('Only the session host can control the timer', 'warning');
+        return;
+    }
+    
     timerState.isRunning = false;
     timerState.isPaused = false;
     clearInterval(timerState.interval);
@@ -565,7 +589,72 @@ function resetTimer() {
     statusElement.textContent = 'Ready to start';
     
     updateTimerDisplay();
+    
+    // Sync timer reset
+    if (collaborationState.isConnected) {
+        syncTimerReset();
+    }
+    
     showNotification('Timer reset', 'info');
+}
+
+// Local timer for non-collaborative sessions
+function startLocalTimer() {
+    timerState.interval = setInterval(() => {
+        timerState.remaining--;
+        updateTimerDisplay();
+        
+        if (timerState.remaining <= 0) {
+            timerEnded();
+        }
+    }, 1000);
+}
+
+// Sync timer start with server timestamp
+function syncTimerStart() {
+    if (!collaborationState.isConnected) return;
+    
+    const timerRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/timer`);
+    const serverTimestamp = firebase.database.ServerValue.TIMESTAMP;
+    
+    timerRef.set({
+        isRunning: true,
+        isPaused: false,
+        duration: timerState.duration,
+        remaining: timerState.remaining,
+        startTime: serverTimestamp,
+        lastUpdateTime: serverTimestamp,
+        endTime: null
+    });
+}
+
+// Sync timer pause
+function syncTimerPause() {
+    if (!collaborationState.isConnected) return;
+    
+    const timerRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/timer`);
+    timerRef.update({
+        isRunning: false,
+        isPaused: true,
+        remaining: timerState.remaining,
+        lastUpdateTime: firebase.database.ServerValue.TIMESTAMP
+    });
+}
+
+// Sync timer reset
+function syncTimerReset() {
+    if (!collaborationState.isConnected) return;
+    
+    const timerRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/timer`);
+    timerRef.set({
+        isRunning: false,
+        isPaused: false,
+        duration: timerState.duration,
+        remaining: timerState.remaining,
+        startTime: null,
+        lastUpdateTime: firebase.database.ServerValue.TIMESTAMP,
+        endTime: null
+    });
 }
 
 function updateTimerDisplay() {
@@ -603,6 +692,17 @@ function timerEnded() {
     statusElement.textContent = 'Time\'s up!';
     timeElement.textContent = '00:00';
     timeElement.classList.add('danger');
+    
+    // Sync timer end to collaborative session
+    if (collaborationState.isConnected) {
+        const timerRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/timer`);
+        timerRef.update({
+            isRunning: false,
+            isPaused: false,
+            remaining: 0,
+            endTime: firebase.database.ServerValue.TIMESTAMP
+        });
+    }
     
     // Play sound notification (if supported)
     try {
@@ -769,6 +869,9 @@ function setupDataSynchronization() {
             updateFromSharedData(sharedData);
         }
     });
+
+    // Setup real-time timer synchronization
+    setupTimerSynchronization();
     
     // Override save function to sync to Firebase
     const originalSaveRetroData = saveRetroData;
@@ -807,6 +910,131 @@ function setupUserPresence() {
     });
 }
 
+// Setup real-time timer synchronization
+function setupTimerSynchronization() {
+    const timerRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/timer`);
+    collaborationState.timerRef = timerRef;
+    
+    // Calculate server time offset
+    const offsetRef = collaborationState.database.ref('.info/serverTimeOffset');
+    offsetRef.on('value', snapshot => {
+        collaborationState.serverTimeOffset = snapshot.val() || 0;
+    });
+    
+    // Listen for timer changes
+    timerRef.on('value', snapshot => {
+        if (snapshot.exists()) {
+            const timerData = snapshot.val();
+            updateTimerFromSharedData(timerData);
+        }
+    });
+}
+
+// Update timer from shared data
+function updateTimerFromSharedData(timerData) {
+    if (!timerData) return;
+    
+    const wasRunning = timerState.isRunning;
+    
+    // Update timer state
+    timerState.duration = timerData.duration;
+    timerState.isRunning = timerData.isRunning;
+    timerState.isPaused = timerData.isPaused;
+    
+    // Calculate real-time remaining time if timer is running
+    if (timerData.isRunning && timerData.startTime) {
+        const serverNow = Date.now() + collaborationState.serverTimeOffset;
+        const elapsed = Math.floor((serverNow - timerData.startTime) / 1000);
+        timerState.remaining = Math.max(0, timerData.duration * 60 - elapsed);
+        
+        // Start local countdown if not already running
+        if (!wasRunning) {
+            startRealTimeTimer();
+        }
+    } else {
+        // Timer is paused or stopped
+        timerState.remaining = timerData.remaining || timerData.duration * 60;
+        clearInterval(timerState.interval);
+    }
+    
+    // Update UI
+    updateTimerUI();
+    updateTimerDisplay();
+    
+    // Check if timer ended
+    if (timerState.remaining <= 0 && timerState.isRunning) {
+        timerEnded();
+    }
+}
+
+// Start real-time timer countdown
+function startRealTimeTimer() {
+    clearInterval(timerState.interval);
+    
+    timerState.interval = setInterval(() => {
+        if (timerState.isRunning && timerState.remaining > 0) {
+            timerState.remaining--;
+            updateTimerDisplay();
+            
+            if (timerState.remaining <= 0) {
+                timerEnded();
+            }
+        }
+    }, 1000);
+}
+
+// Update timer UI elements
+function updateTimerUI() {
+    const startBtn = document.getElementById('startTimer');
+    const pauseBtn = document.getElementById('pauseTimer');
+    const minutesInput = document.getElementById('timerMinutes');
+    const statusElement = document.getElementById('timerStatus');
+    
+    minutesInput.value = timerState.duration;
+    
+    // Check if user can control timer (only host in collaborative sessions)
+    const canControlTimer = !collaborationState.isConnected || collaborationState.isHost;
+    
+    if (timerState.isRunning) {
+        startBtn.disabled = true;
+        pauseBtn.disabled = !canControlTimer;
+        minutesInput.disabled = true;
+        statusElement.textContent = collaborationState.isHost ? 'Timer running...' : 
+                                   collaborationState.isConnected ? 'Timer running (Host controlled)...' : 'Timer running...';
+    } else if (timerState.isPaused) {
+        startBtn.disabled = !canControlTimer;
+        pauseBtn.disabled = true;
+        minutesInput.disabled = true;
+        statusElement.textContent = collaborationState.isHost ? 'Timer paused' : 
+                                   collaborationState.isConnected ? 'Timer paused (Host controlled)' : 'Timer paused';
+    } else {
+        startBtn.disabled = !canControlTimer;
+        pauseBtn.disabled = true;
+        minutesInput.disabled = !canControlTimer;
+        statusElement.textContent = collaborationState.isHost ? 'Ready to start' : 
+                                   collaborationState.isConnected ? 'Ready to start (Host controls timer)' : 'Ready to start';
+    }
+    
+    // Add visual indicator for non-host users
+    if (collaborationState.isConnected && !collaborationState.isHost) {
+        [startBtn, pauseBtn].forEach(btn => {
+            if (!btn.disabled) {
+                btn.style.opacity = '0.6';
+                btn.title = 'Only the session host can control the timer';
+            }
+        });
+        if (!minutesInput.disabled) {
+            minutesInput.style.opacity = '0.6';
+            minutesInput.title = 'Only the session host can change timer duration';
+        }
+    } else {
+        [startBtn, pauseBtn, minutesInput].forEach(element => {
+            element.style.opacity = '1';
+            element.title = '';
+        });
+    }
+}
+
 // Generate session ID
 function generateSessionId() {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
@@ -819,12 +1047,6 @@ function saveSharedData() {
     const dataRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/data`);
     dataRef.set({
         retroData: retroData,
-        timerState: {
-            duration: timerState.duration,
-            remaining: timerState.remaining,
-            isRunning: timerState.isRunning,
-            isPaused: timerState.isPaused
-        },
         isTextHidden: isTextHidden,
         lastUpdated: firebase.database.ServerValue.TIMESTAMP
     });
@@ -864,14 +1086,6 @@ function updateFromSharedData(sharedData) {
         renderItems('action');
         renderTeamMembers();
         updateAllCounts();
-    }
-    
-    // Update timer state
-    if (sharedData.timerState) {
-        timerState.duration = sharedData.timerState.duration;
-        timerState.remaining = sharedData.timerState.remaining;
-        document.getElementById('timerMinutes').value = timerState.duration;
-        updateTimerDisplay();
     }
     
     // Update reveal state
