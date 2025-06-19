@@ -1,3 +1,28 @@
+// Generate unique user ID
+function generateUserId() {
+    return 'user_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Get color for current user's items (only current user gets special coloring)
+function getCurrentUserColor() {
+    // Special color scheme for the current user's items
+    return {
+        bg: '#E8F4FD',     // Light blue background
+        border: '#2196F3',  // Blue border
+        text: '#1565C0'     // Dark blue text
+    };
+}
+
+// Get neutral color for other users' items
+function getOtherUsersColor() {
+    // Neutral color scheme for all other users
+    return {
+        bg: '#f7fafc',      // Light gray background (same as default)
+        border: '#e2e8f0',  // Light gray border (same as default)
+        text: '#2d3748'     // Dark gray text (same as default)
+    };
+}
+
 // State management
 let retroData = {
     sprintName: '',
@@ -23,6 +48,7 @@ let timerState = {
 
 // Reveal state
 let isTextHidden = false;
+let hideMode = 'all'; // 'all', 'others', or 'none'
 
 // Collaboration state
 let collaborationState = {
@@ -33,7 +59,9 @@ let collaborationState = {
     onlineUsers: {},
     isHost: false,
     timerRef: null,
-    serverTimeOffset: 0
+    serverTimeOffset: 0,
+    revealRef: null,
+    userColors: {} // Store color assignments for users
 };
 
 // Initialize the app
@@ -60,56 +88,221 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add enter key support for inputs
     setupEnterKeySupport();
+    
+    // Add button event listeners as backup
+    setupButtonEventListeners();
+    
+    // Initialize all add buttons as disabled
+    initializeButtonStates();
 });
+
+// Initialize all add button states
+function initializeButtonStates() {
+    const buttons = [
+        { selector: '.went-well .add-btn', inputId: 'wellInput' },
+        { selector: '.could-improve .add-btn', inputId: 'improveInput' },
+        { selector: '.action-items .add-btn', inputId: 'actionInput' }
+    ];
+    
+    buttons.forEach(({ selector, inputId }) => {
+        const button = document.querySelector(selector);
+        const input = document.getElementById(inputId);
+        
+        if (button && input) {
+            const hasText = input.value.trim().length > 0;
+            button.disabled = !hasText;
+            
+            if (hasText) {
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+                button.title = '';
+            } else {
+                button.style.opacity = '0.5';
+                button.style.cursor = 'not-allowed';
+                button.title = 'Enter some text first';
+            }
+        }
+    });
+}
 
 // Setup enter key support for all input fields
 function setupEnterKeySupport() {
-    document.getElementById('wellInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addItem('well');
-    });
-    
-    document.getElementById('improveInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addItem('improve');
-    });
-    
-    document.getElementById('actionInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addItem('action');
-    });
+    // Setup input fields with both keypress and input monitoring
+    setupInputField('wellInput', 'well', addItem);
+    setupInputField('improveInput', 'improve', addItem);
+    setupInputField('actionInput', 'action', addItem);
     
     document.getElementById('memberInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addTeamMember();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addTeamMember();
+        }
+    });
+}
+
+// Setup individual input field with button state management
+function setupInputField(inputId, category, actionFunction) {
+    const input = document.getElementById(inputId);
+    const button = document.querySelector(`.${category === 'well' ? 'went-well' : category === 'improve' ? 'could-improve' : 'action-items'} .add-btn`);
+    
+    if (!input || !button) {
+        console.warn(`Input or button not found for ${category}`);
+        return;
+    }
+    
+    // Function to update button state
+    function updateButtonState() {
+        const hasText = input.value.trim().length > 0;
+        button.disabled = !hasText;
+        
+        // Update button styling
+        if (hasText) {
+            button.style.opacity = '1';
+            button.style.cursor = 'pointer';
+            button.title = '';
+        } else {
+            button.style.opacity = '0.5';
+            button.style.cursor = 'not-allowed';
+            button.title = 'Enter some text first';
+        }
+    }
+    
+    // Monitor input changes
+    input.addEventListener('input', updateButtonState);
+    input.addEventListener('keyup', updateButtonState);
+    input.addEventListener('paste', () => setTimeout(updateButtonState, 0));
+    
+    // Handle Enter key
+    input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const hasText = this.value.trim().length > 0;
+            if (hasText) {
+                actionFunction(category, e);
+            }
+        }
+    });
+    
+    // Initialize button state
+    updateButtonState();
+}
+
+// Setup button event listeners as backup to onclick handlers
+function setupButtonEventListeners() {
+    // Add event listeners for add buttons
+    const addButtons = [
+        { selector: '.went-well .add-btn', category: 'well' },
+        { selector: '.could-improve .add-btn', category: 'improve' },
+        { selector: '.action-items .add-btn', category: 'action' }
+    ];
+    
+    addButtons.forEach(({ selector, category }) => {
+        const button = document.querySelector(selector);
+        if (button) {
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Only proceed if button is not disabled
+                if (!this.disabled) {
+                    addItem(category, event);
+                }
+                return false;
+            });
+        }
     });
 }
 
 // Add item to a specific category
-function addItem(category) {
-    const input = document.getElementById(category + 'Input');
-    const text = input.value.trim();
-    
-    if (text === '') {
-        showNotification('Please enter some text', 'error');
-        return;
+function addItem(category, event) {
+    // Prevent any form submission or page refresh
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
     }
     
-    const item = {
-        id: generateId(),
-        text: text,
-        timestamp: new Date().toLocaleString(),
-        votes: 0
-    };
+    const input = document.getElementById(category + 'Input');
+    if (!input) {
+        console.error('Input element not found for category:', category);
+        return false;
+    }
     
-    retroData.items[category].push(item);
-    input.value = '';
+    const text = input.value.trim();
     
-    renderItems(category);
-    updateCount(category);
-    saveRetroData();
-    showNotification('Item added successfully!', 'success');
+    // Only proceed if there's text - silent return without error message
+    if (!text || text === '') {
+        return false;
+    }
+    
+    try {
+        const item = {
+            id: generateId(),
+            text: text,
+            timestamp: new Date().toLocaleString(),
+            votes: 0,
+            createdBy: {
+                userId: collaborationState.userId,
+                sessionId: collaborationState.currentSessionId,
+                isHost: collaborationState.isHost
+            }
+        };
+
+        retroData.items[category].push(item);
+        input.value = '';
+        
+        // Update button state after clearing input
+        const button = document.querySelector(`.${category === 'well' ? 'went-well' : category === 'improve' ? 'could-improve' : 'action-items'} .add-btn`);
+        if (button) {
+            button.disabled = true;
+            button.style.opacity = '0.5';
+            button.style.cursor = 'not-allowed';
+            button.title = 'Enter some text first';
+        }
+        
+        renderItems(category);
+        updateCount(category);
+        // Ensure reveal state is maintained after adding new items
+        updateRevealUI();
+        saveRetroData();
+        showNotification('Item added successfully!', 'success');
+        
+        return true; // Indicate success
+        
+    } catch (error) {
+        console.error('Error adding item:', error);
+        showNotification('Error adding item', 'error');
+        return false;
+    }
 }
 
 // Generate unique ID
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Check if current user can edit an item
+function canEditItem(item) {
+    // If not in collaborative mode, user can edit all items
+    if (!collaborationState.isConnected) {
+        return true;
+    }
+    
+    // If item doesn't have creator info (legacy items), allow editing
+    if (!item.createdBy) {
+        return true;
+    }
+    
+    // User can edit their own items
+    if (item.createdBy.userId === collaborationState.userId) {
+        return true;
+    }
+    
+    // Host can edit all items (optional - you might want to disable this)
+    if (collaborationState.isHost) {
+        return true;
+    }
+    
+    return false;
 }
 
 // Render items for a specific category
@@ -127,25 +320,83 @@ function renderItems(category) {
 function createItemElement(item, category) {
     const div = document.createElement('div');
     div.className = 'item';
-    div.onclick = () => editItem(item.id, category);
+    
+    const canEdit = canEditItem(item);
+    
+    // Add class to identify items created by current user
+    if (collaborationState.isConnected && item.createdBy && item.createdBy.userId === collaborationState.userId) {
+        div.classList.add('my-item');
+    }
+    
+    // Apply color scheme in collaborative mode
+    if (collaborationState.isConnected && item.createdBy && item.createdBy.userId) {
+        if (item.createdBy.userId === collaborationState.userId) {
+            // Current user's items get special highlighting
+            const userColor = getCurrentUserColor();
+            div.style.backgroundColor = userColor.bg;
+            div.style.borderColor = userColor.border;
+            div.style.borderWidth = '2px';
+            div.style.borderStyle = 'solid';
+            div.setAttribute('data-user-type', 'current-user');
+            div.setAttribute('title', 'Your item');
+        } else {
+            // Other users' items get neutral styling
+            const neutralColor = getOtherUsersColor();
+            div.style.backgroundColor = neutralColor.bg;
+            div.style.borderColor = neutralColor.border;
+            div.style.borderWidth = '1px';
+            div.style.borderStyle = 'solid';
+            div.setAttribute('data-user-type', 'other-user');
+            div.setAttribute('title', `Item by another user`);
+        }
+    }
+    
+    // Only make item clickable for editing if user can edit it
+    if (canEdit) {
+        div.onclick = () => editItem(item.id, category);
+        div.style.cursor = 'pointer';
+    }
+    
+    // Create edit and delete buttons only if user can edit
+    const editButton = canEdit ? 
+        `<button class="item-btn edit-btn" onclick="event.stopPropagation(); editItem('${item.id}', '${category}')" title="Edit">
+            <i class="fas fa-edit"></i>
+        </button>` : '';
+    
+    const deleteButton = canEdit ? 
+        `<button class="item-btn delete-btn" onclick="event.stopPropagation(); deleteItem('${item.id}', '${category}')" title="Delete">
+            <i class="fas fa-trash"></i>
+        </button>` : '';
+    
+    // Add visual indicator for items created by current user (enhanced for collaborative mode)
+    const ownershipIndicator = canEdit && collaborationState.isConnected ? 
+        `<span class="ownership-indicator" title="Your item">
+            <i class="fas fa-user"></i>
+        </span>` : 
+        (collaborationState.isConnected && item.createdBy && item.createdBy.userId !== collaborationState.userId ?
+        `<span class="user-indicator" title="Item by another user">
+            <i class="fas fa-user-friends"></i>
+        </span>` : '');
     
     div.innerHTML = `
         <div class="item-text">${escapeHtml(item.text)}</div>
         <div class="item-meta">
             <span class="timestamp">${item.timestamp}</span>
+            ${ownershipIndicator}
             <div class="item-actions">
                 <button class="item-btn vote-btn" onclick="event.stopPropagation(); voteItem('${item.id}', '${category}')" title="Vote">
                     <i class="fas fa-heart"></i> ${item.votes}
                 </button>
-                <button class="item-btn edit-btn" onclick="event.stopPropagation(); editItem('${item.id}', '${category}')" title="Edit">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="item-btn delete-btn" onclick="event.stopPropagation(); deleteItem('${item.id}', '${category}')" title="Delete">
-                    <i class="fas fa-trash"></i>
-                </button>
+                ${editButton}
+                ${deleteButton}
             </div>
         </div>
     `;
+    
+    // Add visual styling for non-editable items
+    if (!canEdit && collaborationState.isConnected) {
+        div.classList.add('item-readonly');
+    }
     
     return div;
 }
@@ -163,6 +414,8 @@ function voteItem(itemId, category) {
     if (item) {
         item.votes++;
         renderItems(category);
+        // Ensure reveal state is maintained after voting
+        updateRevealUI();
         saveRetroData();
         showNotification('Vote added!', 'success');
     }
@@ -172,6 +425,12 @@ function voteItem(itemId, category) {
 function editItem(itemId, category) {
     const item = retroData.items[category].find(item => item.id === itemId);
     if (item) {
+        // Check if user has permission to edit this item
+        if (!canEditItem(item)) {
+            showNotification('You can only edit items you created', 'error');
+            return;
+        }
+        
         currentEditingItem = { itemId, category };
         document.getElementById('modalText').value = item.text;
         document.getElementById('itemModal').style.display = 'block';
@@ -191,8 +450,17 @@ function saveItemEdit() {
         }
         
         if (item) {
+            // Double-check permission before saving
+            if (!canEditItem(item)) {
+                showNotification('You can only edit items you created', 'error');
+                closeModal();
+                return;
+            }
+            
             item.text = newText;
             renderItems(category);
+            // Ensure reveal state is maintained after editing
+            updateRevealUI();
             saveRetroData();
             closeModal();
             showNotification('Item updated successfully!', 'success');
@@ -202,10 +470,21 @@ function saveItemEdit() {
 
 // Delete item
 function deleteItem(itemId, category) {
+    const item = retroData.items[category].find(item => item.id === itemId);
+    if (item) {
+        // Check if user has permission to delete this item
+        if (!canEditItem(item)) {
+            showNotification('You can only delete items you created', 'error');
+            return;
+        }
+    }
+    
     if (confirm('Are you sure you want to delete this item?')) {
         retroData.items[category] = retroData.items[category].filter(item => item.id !== itemId);
         renderItems(category);
         updateCount(category);
+        // Ensure reveal state is maintained after deleting
+        updateRevealUI();
         saveRetroData();
         showNotification('Item deleted', 'info');
     }
@@ -307,6 +586,76 @@ function clearAll() {
     }
 }
 
+// Start fresh retrospective
+function startFresh() {
+    const confirmMessage = collaborationState.isConnected && collaborationState.isHost 
+        ? 'Are you sure you want to start a completely fresh retrospective? This will clear ALL data for ALL users in the collaborative session and cannot be undone.'
+        : collaborationState.isConnected && !collaborationState.isHost
+        ? 'Only the session host can start fresh for all users. This will only clear your local data and disconnect you from the session.'
+        : 'Are you sure you want to start a completely fresh retrospective? This will clear all local data and cannot be undone.';
+    
+    if (confirm(confirmMessage)) {
+        // Clear localStorage
+        localStorage.removeItem('retroData');
+        
+        // If connected to collaborative session, clear it for all users
+        if (collaborationState.isConnected) {
+            // Only host can clear collaborative session
+            if (collaborationState.isHost) {
+                // Clear the entire session data for all users
+                const sessionRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}`);
+                sessionRef.remove()
+                    .then(() => {
+                        showNotification('Collaborative session cleared for all users', 'info');
+                    })
+                    .catch(error => {
+                        console.error('Failed to clear collaborative session:', error);
+                        showNotification('Warning: Could not clear collaborative session', 'warning');
+                    });
+            } else {
+                showNotification('Only the session host can start fresh for all users. You have been disconnected.', 'warning');
+                // Non-host users just disconnect but keep their local data
+            }
+            
+            // Disconnect locally
+            collaborationState.isConnected = false;
+            collaborationState.currentSessionId = null;
+            collaborationState.isHost = false;
+            document.getElementById('sessionInfo').style.display = 'none';
+            document.getElementById('sessionId').value = '';
+        }
+        
+        // Reset data
+        retroData = {
+            sprintName: '',
+            sprintDate: '',
+            items: {
+                well: [],
+                improve: [],
+                action: []
+            },
+            teamMembers: []
+        };
+        
+        // Reset reveal state
+        isTextHidden = false;
+        hideMode = 'none';
+        
+        // Clear UI
+        document.getElementById('sprintName').value = '';
+        document.getElementById('sprintDate').value = new Date().toISOString().split('T')[0];
+        
+        renderItems('well');
+        renderItems('improve');
+        renderItems('action');
+        renderTeamMembers();
+        updateAllCounts();
+        updateRevealUI();
+        
+        showNotification('Started fresh retrospective', 'success');
+    }
+}
+
 // Export retrospective summary
 function exportRetro() {
     const sprintName = retroData.sprintName || 'Unnamed Sprint';
@@ -376,6 +725,11 @@ function loadRetroData() {
         renderItems('action');
         renderTeamMembers();
         updateAllCounts();
+        
+        // Show notification that previous data was loaded
+        if (retroData.sprintName || retroData.items.well.length > 0 || retroData.items.improve.length > 0 || retroData.items.action.length > 0) {
+            showNotification('Previous retrospective data loaded. Click "Start Fresh" to begin anew.', 'info');
+        }
     }
 }
 
@@ -526,6 +880,8 @@ function startTimer() {
     // For collaborative sessions, sync timer start with server timestamp
     if (collaborationState.isConnected) {
         syncTimerStart();
+        // Also start local timer for immediate host feedback
+        startLocalTimer();
     } else {
         // Local timer
         startLocalTimer();
@@ -706,30 +1062,15 @@ function timerEnded() {
     
     // Play sound notification (if supported)
     try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmQdBjeCz/LNeSsFJnbG8N2QQAoUXrTp66hVFApGn+DyvmQdBjeCz/LNeSsFJnbG8N2QQAoUXrTp66hVFApGn+DyvmQdBjeCz/LNeSsFJnbG8N2QQAoUXrTp66hVFApGn+DyvmQdBg==');
-        audio.play().catch(() => {}); // Ignore errors if audio can't play
-    } catch (e) {}
-    
-    showNotification('⏰ Time\'s up! Retrospective meeting time has ended.', 'warning');
-}
-
-// Reveal/Hide Functions
-function toggleReveal() {
-    isTextHidden = !isTextHidden;
-    const toggleBtn = document.getElementById('revealToggle');
-    const columns = document.querySelectorAll('.column');
-    
-    if (isTextHidden) {
-        columns.forEach(column => column.classList.add('text-hidden'));
-        columns.forEach(column => column.classList.remove('text-revealed'));
-        toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Reveal All Text';
-        showNotification('All text is now hidden', 'info');
-    } else {
-        columns.forEach(column => column.classList.add('text-revealed'));
-        columns.forEach(column => column.classList.remove('text-hidden'));
-        toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide All Text';
-        showNotification('All text is now revealed', 'info');
+        const audio = new Audio('notification.mp3');
+        audio.play().catch(error => {
+            console.error('Error playing notification sound:', error);
+        });
+    } catch (error) {
+        console.log('Audio notification not supported');
     }
+    
+    showNotification('Time\'s up!', 'warning');
 }
 
 // Initialize timer display
@@ -768,11 +1109,6 @@ window.addEventListener('load', function() {
 
 // ===== COLLABORATION FUNCTIONS =====
 
-// Generate unique user ID
-function generateUserId() {
-    return 'user_' + Math.random().toString(36).substr(2, 9);
-}
-
 // Initialize collaboration features
 function initializeCollaboration() {
     try {
@@ -799,12 +1135,177 @@ function createSession() {
         return;
     }
     
+    // Check if user has existing data
+    const hasExistingData = retroData.sprintName || 
+                           retroData.items.well.length > 0 || 
+                           retroData.items.improve.length > 0 || 
+                           retroData.items.action.length > 0 ||
+                           retroData.teamMembers.length > 0;
+    
+    if (hasExistingData) {
+        // Show custom dialog for data handling choice
+        showCreateSessionDialog();
+    } else {
+        // No existing data, just create the session
+        proceedWithSessionCreation(false);
+    }
+}
+
+// Show dialog for creating session with existing data
+function showCreateSessionDialog() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'createSessionModal'; // Add unique ID
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <h3><i class="fas fa-users"></i> Create Collaborative Session</h3>
+            <p>You have existing retrospective data. What would you like to do?</p>
+            
+            <div style="margin: 20px 0;">
+                <div style="padding: 15px; border: 2px solid #48bb78; border-radius: 10px; margin-bottom: 15px; background: #f0fff4;">
+                    <h4 style="margin: 0 0 10px 0; color: #2f855a;"><i class="fas fa-sparkles"></i> Start Fresh Session</h4>
+                    <p style="margin: 0; color: #2f855a;">Clear all current data and begin with a clean retrospective. Perfect for a new sprint or team meeting.</p>
+                </div>
+                
+                <div style="padding: 15px; border: 2px solid #667eea; border-radius: 10px; background: #f7faff;">
+                    <h4 style="margin: 0 0 10px 0; color: #553c9a;"><i class="fas fa-share"></i> Share Current Data</h4>
+                    <p style="margin: 0; color: #553c9a;">Keep current data and share it with team members who join the session.</p>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button id="startFreshBtn" class="btn btn-success" style="margin-right: 10px;">
+                    <i class="fas fa-sparkles"></i> Start Fresh
+                </button>
+                <button id="shareDataBtn" class="btn btn-primary" style="margin-right: 10px;">
+                    <i class="fas fa-share"></i> Share Current Data
+                </button>
+                <button id="cancelBtn" class="btn btn-secondary">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add proper event listeners
+    const startFreshBtn = modal.querySelector('#startFreshBtn');
+    const shareDataBtn = modal.querySelector('#shareDataBtn');
+    const cancelBtn = modal.querySelector('#cancelBtn');
+    
+    startFreshBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleCreateSessionChoice(true);
+    });
+    
+    shareDataBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleCreateSessionChoice(false);
+    });
+    
+    cancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeCreateSessionDialog();
+    });
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            closeCreateSessionDialog();
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function escapeHandler(event) {
+        if (event.key === 'Escape') {
+            closeCreateSessionDialog();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    });
+}
+
+// Handle create session choice
+function handleCreateSessionChoice(startFresh) {
+    closeCreateSessionDialog();
+    proceedWithSessionCreation(startFresh);
+}
+
+// Close create session dialog
+function closeCreateSessionDialog() {
+    const modal = document.getElementById('createSessionModal');
+    if (modal) {
+        // Add a smooth fade-out animation before removing
+        modal.style.opacity = '0';
+        modal.style.transform = 'scale(0.9)';
+        modal.style.transition = 'all 0.3s ease';
+        
+        // Remove the modal after animation completes
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.remove();
+            }
+        }, 300);
+    }
+}
+
+// Proceed with session creation
+function proceedWithSessionCreation(shouldClearData) {
+    // Clear data if user chose to start fresh
+    if (shouldClearData) {
+        clearDataForNewSession();
+    }
+    
     const sessionId = generateSessionId();
     collaborationState.currentSessionId = sessionId;
     collaborationState.isHost = true;
     
     setupSession(sessionId);
-    showNotification('Session created! Share ID: ' + sessionId, 'success');
+    
+    if (shouldClearData) {
+        showNotification(`Fresh session created! Share ID: ${sessionId}`, 'success');
+    } else {
+        showNotification(`Session created with current data! Share ID: ${sessionId}`, 'success');
+    }
+}
+
+// Clear data for new session (similar to startFresh but without session clearing)
+function clearDataForNewSession() {
+    // Clear localStorage
+    localStorage.removeItem('retroData');
+    
+    // Reset data
+    retroData = {
+        sprintName: '',
+        sprintDate: '',
+        items: {
+            well: [],
+            improve: [],
+            action: []
+        },
+        teamMembers: []
+    };
+    
+    // Reset reveal state
+    isTextHidden = false;
+    hideMode = 'none';
+    
+    // Clear UI
+    document.getElementById('sprintName').value = '';
+    document.getElementById('sprintDate').value = new Date().toISOString().split('T')[0];
+    
+    renderItems('well');
+    renderItems('improve');
+    renderItems('action');
+    renderTeamMembers();
+    updateAllCounts();
+    updateRevealUI();
+    
+    // Update button states after clearing
+    if (typeof initializeButtonStates === 'function') {
+        initializeButtonStates();
+    }
 }
 
 // Join existing session
@@ -851,6 +1352,10 @@ function setupSession(sessionId) {
     // Setup real-time listeners
     setupDataSynchronization();
     setupUserPresence();
+    setupUserColorSynchronization();
+    
+    // Update UI for host permissions
+    updateRevealUI();
     
     // Save session data
     if (collaborationState.isHost) {
@@ -867,20 +1372,39 @@ function setupDataSynchronization() {
         if (snapshot.exists()) {
             const sharedData = snapshot.val();
             updateFromSharedData(sharedData);
+        } else if (collaborationState.isConnected && !collaborationState.isHost) {
+            // Session was deleted by host (start fresh) - disconnect gracefully
+            handleSessionEnded();
         }
     });
 
     // Setup real-time timer synchronization
     setupTimerSynchronization();
     
-    // Override save function to sync to Firebase
-    const originalSaveRetroData = saveRetroData;
-    saveRetroData = function() {
-        originalSaveRetroData();
-        if (collaborationState.isConnected) {
-            saveSharedData();
-        }
-    };
+    // Setup real-time reveal synchronization
+    setupRevealSynchronization();
+}
+
+// Handle session ended (when host starts fresh)
+function handleSessionEnded() {
+    if (!collaborationState.isConnected) return;
+    
+    // Disconnect from session
+    collaborationState.isConnected = false;
+    collaborationState.currentSessionId = null;
+    collaborationState.isHost = false;
+    
+    // Update UI
+    document.getElementById('sessionInfo').style.display = 'none';
+    
+    // Clear session input
+    document.getElementById('sessionId').value = '';
+    
+    // Show notification to user
+    showNotification('Session ended by host. You have been disconnected.', 'warning');
+    
+    // Keep current local data - don't clear it
+    // This allows users to continue working locally or join a new session
 }
 
 // Setup user presence tracking
@@ -926,8 +1450,36 @@ function setupTimerSynchronization() {
         if (snapshot.exists()) {
             const timerData = snapshot.val();
             updateTimerFromSharedData(timerData);
+        } else if (collaborationState.isConnected && !collaborationState.isHost) {
+            // Timer data was deleted (session ended) - reset timer UI
+            resetTimerForSessionEnd();
         }
     });
+}
+
+// Reset timer UI when session ends
+function resetTimerForSessionEnd() {
+    // Reset timer state to default
+    timerState.isRunning = false;
+    timerState.isPaused = false;
+    timerState.duration = 30;
+    timerState.remaining = 30 * 60;
+    clearInterval(timerState.interval);
+    
+    // Reset timer UI
+    const startBtn = document.getElementById('startTimer');
+    const pauseBtn = document.getElementById('pauseTimer');
+    const minutesInput = document.getElementById('timerMinutes');
+    const statusElement = document.getElementById('timerStatus');
+    
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    minutesInput.disabled = false;
+    minutesInput.value = timerState.duration;
+    statusElement.textContent = 'Ready to start';
+    
+    updateTimerDisplay();
+    updateTimerUI();
 }
 
 // Update timer from shared data
@@ -1035,6 +1587,136 @@ function updateTimerUI() {
     }
 }
 
+// ===== REVEAL SYNCHRONIZATION FUNCTIONS =====
+
+// Setup reveal synchronization
+function setupRevealSynchronization() {
+    const revealRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/reveal`);
+    collaborationState.revealRef = revealRef;
+    
+    // Listen for reveal state changes
+    revealRef.on('value', snapshot => {
+        if (snapshot.exists()) {
+            const revealData = snapshot.val();
+            updateRevealFromSharedData(revealData);
+        } else if (collaborationState.isConnected && !collaborationState.isHost) {
+            // Reveal data was deleted (session ended) - reset to default state
+            isTextHidden = false;
+            hideMode = 'none';
+            updateRevealUI();
+        }
+    });
+    
+    // Initialize reveal state for new sessions or update for existing ones
+    if (collaborationState.isHost) {
+        // Check if reveal data already exists before overwriting
+        revealRef.once('value').then(snapshot => {
+            if (!snapshot.exists()) {
+                // No existing reveal data, set defaults
+                revealRef.set({
+                    isTextHidden: isTextHidden,
+                    hideMode: hideMode,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+            // If data exists, the listener above will handle it
+        });
+    } else {
+        // For participants, force update UI to match current state
+        updateRevealUI();
+    }
+}
+
+// Setup user color synchronization (simplified for current user highlighting only)
+function setupUserColorSynchronization() {
+    // No need for complex synchronization since we only highlight current user
+    // All users will see their own items highlighted in blue, others in neutral gray
+    console.log('User color highlighting initialized - current user items will be highlighted');
+}
+
+// Ensure current user has a color assignment (simplified)
+function ensureUserColorAssignment() {
+    // No Firebase storage needed since colors are determined locally
+    // Current user always gets blue, others always get neutral
+}
+
+// Update reveal state from shared data
+function updateRevealFromSharedData(revealData) {
+    if (!revealData) return;
+    
+    const wasHidden = isTextHidden;
+    const wasHideMode = hideMode;
+    
+    isTextHidden = revealData.isTextHidden;
+    hideMode = revealData.hideMode || 'all'; // Default to 'all' for backward compatibility
+    
+    // Always update UI to ensure synchronization
+    updateRevealUI();
+    
+    // Only show notification if state actually changed and user is not host
+    if ((wasHidden !== isTextHidden || wasHideMode !== hideMode) && !collaborationState.isHost) {
+        let message;
+        if (hideMode === 'others') {
+            message = 'Host set: Others\' text hidden';
+        } else {
+            message = isTextHidden ? 'Text hidden by host' : 'Text revealed by host';
+        }
+        showNotification(message, 'info');
+    }
+}
+
+// Sync reveal state to Firebase
+function syncRevealState() {
+    if (!collaborationState.isConnected || !collaborationState.revealRef) return;
+    
+    collaborationState.revealRef.update({
+        isTextHidden: isTextHidden,
+        hideMode: hideMode,
+        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    });
+}
+
+// Update reveal UI elements
+function updateRevealUI() {
+    const toggleBtn = document.getElementById('revealToggle');
+    const columns = document.querySelectorAll('.column');
+    
+    // Clear all reveal/hide classes first
+    columns.forEach(column => {
+        column.classList.remove('text-hidden', 'text-revealed', 'hide-others-only');
+    });
+    
+    // Apply appropriate classes based on hide mode
+    if (hideMode === 'all' && isTextHidden) {
+        columns.forEach(column => column.classList.add('text-hidden'));
+        toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Reveal All Text';
+    } else if (hideMode === 'others') {
+        columns.forEach(column => column.classList.add('hide-others-only'));
+        toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Reveal Others\' Text';
+    } else {
+        columns.forEach(column => column.classList.add('text-revealed'));
+        // Update button text based on current context
+        if (collaborationState.isConnected) {
+            toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide Text <span style="font-size: 12px;">▼</span>';
+        } else {
+            toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide All Text';
+        }
+    }
+    
+    // Update button permissions for collaborative sessions
+    const canControlReveal = !collaborationState.isConnected || collaborationState.isHost;
+    toggleBtn.disabled = !canControlReveal;
+    
+    // Add visual indicator for non-host users
+    if (collaborationState.isConnected && !collaborationState.isHost) {
+        toggleBtn.style.opacity = '0.6';
+        toggleBtn.title = 'Only the session host can control text visibility';
+    } else {
+        toggleBtn.style.opacity = '1';
+        toggleBtn.title = '';
+    }
+}
+
 // Generate session ID
 function generateSessionId() {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
@@ -1047,7 +1729,6 @@ function saveSharedData() {
     const dataRef = collaborationState.database.ref(`sessions/${collaborationState.currentSessionId}/data`);
     dataRef.set({
         retroData: retroData,
-        isTextHidden: isTextHidden,
         lastUpdated: firebase.database.ServerValue.TIMESTAMP
     });
 }
@@ -1073,9 +1754,24 @@ function loadSharedData() {
 function updateFromSharedData(sharedData) {
     if (!sharedData) return;
     
-    // Update retrospective data
+    // Update retrospective data - completely replace local data with shared data
     if (sharedData.retroData) {
-        retroData = { ...retroData, ...sharedData.retroData };
+        const hasExistingData = retroData.sprintName || 
+                               retroData.items.well.length > 0 || 
+                               retroData.items.improve.length > 0 || 
+                               retroData.items.action.length > 0 ||
+                               retroData.teamMembers.length > 0;
+        
+        retroData = {
+            sprintName: sharedData.retroData.sprintName || '',
+            sprintDate: sharedData.retroData.sprintDate || '',
+            items: {
+                well: sharedData.retroData.items?.well || [],
+                improve: sharedData.retroData.items?.improve || [],
+                action: sharedData.retroData.items?.action || []
+            },
+            teamMembers: sharedData.retroData.teamMembers || []
+        };
         
         // Update UI
         document.getElementById('sprintName').value = retroData.sprintName || '';
@@ -1086,12 +1782,20 @@ function updateFromSharedData(sharedData) {
         renderItems('action');
         renderTeamMembers();
         updateAllCounts();
-    }
-    
-    // Update reveal state
-    if (typeof sharedData.isTextHidden === 'boolean') {
-        isTextHidden = sharedData.isTextHidden;
+        
+        // Reapply reveal state after rendering items
         updateRevealUI();
+        
+        // Only show notification if this is the initial load and there's actually data
+        const hasNewData = retroData.sprintName || 
+                          retroData.items.well.length > 0 || 
+                          retroData.items.improve.length > 0 || 
+                          retroData.items.action.length > 0 ||
+                          retroData.teamMembers.length > 0;
+                          
+        if (hasNewData && !hasExistingData) {
+            showNotification('Loaded collaborative session data', 'info');
+        }
     }
     
     // Save to local storage
@@ -1116,50 +1820,122 @@ function copySessionId() {
         });
 }
 
-// Update reveal UI based on state
-function updateRevealUI() {
-    const toggleBtn = document.getElementById('revealToggle');
-    const columns = document.querySelectorAll('.column');
-    
-    if (isTextHidden) {
-        columns.forEach(column => column.classList.add('text-hidden'));
-        columns.forEach(column => column.classList.remove('text-revealed'));
-        toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Reveal All Text';
-    } else {
-        columns.forEach(column => column.classList.add('text-revealed'));
-        columns.forEach(column => column.classList.remove('text-hidden'));
-        toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide All Text';
+// Toggle reveal/hide all text
+function toggleReveal() {
+    // In collaborative sessions, only host can control reveal
+    if (collaborationState.isConnected && !collaborationState.isHost) {
+        showNotification('Only the session host can control text visibility', 'warning');
+        return;
     }
+    
+    // In collaborative sessions, show options menu
+    if (collaborationState.isConnected) {
+        showHideOptionsMenu();
+        return;
+    }
+    
+    // For single-user mode, toggle between hide all and reveal all
+    if (hideMode === 'all' && isTextHidden) {
+        hideMode = 'none';
+        isTextHidden = false;
+    } else {
+        hideMode = 'all';
+        isTextHidden = true;
+    }
+    
+    updateRevealUI();
+    showNotification(
+        isTextHidden ? 'All text hidden' : 'All text revealed', 
+        'info'
+    );
 }
 
-// Override existing functions to include collaboration
-const originalAddItem = addItem;
-addItem = function(category) {
-    originalAddItem(category);
-    if (collaborationState.isConnected) {
-        saveSharedData();
+// Show hide options menu for collaborative sessions
+function showHideOptionsMenu() {
+    const existingMenu = document.getElementById('hideOptionsMenu');
+    if (existingMenu) {
+        existingMenu.remove();
+        return;
     }
-};
+    
+    const toggleBtn = document.getElementById('revealToggle');
+    const menu = document.createElement('div');
+    menu.id = 'hideOptionsMenu';
+    menu.className = 'hide-options-menu';
+    menu.innerHTML = `
+        <div class="hide-option" onclick="setHideMode('none')">
+            <i class="fas fa-eye"></i> Show All Text
+        </div>
+        <div class="hide-option" onclick="setHideMode('others')">
+            <i class="fas fa-eye-slash"></i> Hide Others' Text Only
+        </div>
+        <div class="hide-option" onclick="setHideMode('all')">
+            <i class="fas fa-eye-slash"></i> Hide All Text
+        </div>
+    `;
+    
+    // Position menu near the button
+    const rect = toggleBtn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 5) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.zIndex = '10000';
+    
+    document.body.appendChild(menu);
+    
+    // Close menu when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target) && e.target !== toggleBtn) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    }, 100);
+}
 
-const originalVoteItem = voteItem;
-voteItem = function(itemId, category) {
-    originalVoteItem(itemId, category);
-    if (collaborationState.isConnected) {
-        saveSharedData();
+// Set hide mode for collaborative sessions
+function setHideMode(mode) {
+    hideMode = mode;
+    
+    if (mode === 'all') {
+        isTextHidden = true;
+    } else {
+        isTextHidden = false;
     }
-};
-
-const originalDeleteItem = deleteItem;
-deleteItem = function(itemId, category) {
-    originalDeleteItem(itemId, category);
+    
+    updateRevealUI();
+    
+    // Sync to Firebase if in collaborative session
     if (collaborationState.isConnected) {
-        saveSharedData();
+        syncRevealState();
     }
-};
+    
+    // Remove menu
+    const menu = document.getElementById('hideOptionsMenu');
+    if (menu) menu.remove();
+    
+    // Show notification
+    let message;
+    switch (mode) {
+        case 'none':
+            message = 'All text revealed';
+            break;
+        case 'others':
+            message = 'Others\' text hidden - your text remains visible';
+            break;
+        case 'all':
+            message = 'All text hidden';
+            break;
+    }
+    showNotification(message, 'info');
+}
 
-const originalToggleReveal = toggleReveal;
-toggleReveal = function() {
-    originalToggleReveal();
+// Override existing functions to include collaboration - SIMPLIFIED APPROACH
+const originalSaveRetroData = saveRetroData;
+saveRetroData = function() {
+    originalSaveRetroData();
+    // Sync to collaborative session after any data save
     if (collaborationState.isConnected) {
         saveSharedData();
     }
