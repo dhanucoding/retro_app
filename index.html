@@ -11,8 +11,17 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <!-- Load local config first (if available) -->
-    <script src="firebase-config-local.js" onerror="console.log('Local config not found, using fallback')"></script>
+    <script>
+      // Only load local config if running on localhost
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        var script = document.createElement('script');
+        script.src = 'firebase-config-local.js';
+        script.onerror = function() {
+          console.log('Local config not found, using fallback');
+        };
+        document.head.appendChild(script);
+      }
+    </script>
     <script src="firebase-config.js"></script>
 </head>
 <body>
