@@ -11,18 +11,22 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- Load local config first (if available) -->
+    <script src="firebase-config-local.js" onerror="console.log('Local config not found, using fallback')"></script>
     <script src="firebase-config.js"></script>
 </head>
 <body>
     <div class="container">
         <header class="header">
             <h1><i class="fas fa-sync-alt"></i> Sprint Retrospective</h1>
+            
+            <!-- Sprint Info moved to top for better visibility -->
             <div class="sprint-info">
                 <input type="text" id="sprintName" placeholder="Sprint Name (e.g., Sprint 23)" class="sprint-input">
                 <input type="date" id="sprintDate" class="date-input">
             </div>
             
-            <!-- Timer Section -->
+            <!-- Timer Section with inline Session Controls -->
             <div class="timer-section">
                 <div class="timer-controls">
                     <div class="timer-input-group">
@@ -44,32 +48,30 @@
                             <i class="fas fa-eye-slash"></i> Hide Text
                         </button>
                     </div>
+                    <!-- Session controls inline with timer buttons -->
+                    <div class="session-controls-inline">
+                        <div class="session-input-group-inline">
+                            <input type="text" id="sessionId" placeholder="Session ID..." class="session-input-compact">
+                            <button class="btn-session-compact" id="joinSession" onclick="joinSession()">
+                                <i class="fas fa-users"></i> Join
+                            </button>
+                            <button class="btn-session-compact" id="createSession" onclick="createSession()" title="Create a new collaborative session">
+                                <i class="fas fa-plus"></i> Create
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="timer-display">
                     <div class="time-remaining" id="timeRemaining">30:00</div>
                     <div class="timer-status" id="timerStatus">Ready to start</div>
                 </div>
-            </div>
-
-            <!-- Session Management -->
-            <div class="session-section">
-                <div class="session-controls">
-                    <div class="session-input-group">
-                        <input type="text" id="sessionId" placeholder="Enter Session ID to join..." class="session-input">
-                        <button class="btn-session" id="joinSession" onclick="joinSession()">
-                            <i class="fas fa-users"></i> Join Session
-                        </button>
-                        <button class="btn-session" id="createSession" onclick="createSession()" title="Create a new collaborative session">
-                            <i class="fas fa-plus"></i> Create New Session
-                        </button>
-                    </div>
-                    <div class="session-info" id="sessionInfo" style="display: none;">
-                        <span class="session-status">Session: <strong id="currentSessionId"></strong></span>
-                        <span class="online-users">Online: <span id="onlineCount">1</span></span>
-                        <button class="btn-copy" onclick="copySessionId()" title="Copy Session ID">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
+                <!-- Session info display -->
+                <div class="session-info" id="sessionInfo" style="display: none;">
+                    <span class="session-status">Session: <strong id="currentSessionId"></strong></span>
+                    <span class="online-users">Online: <span id="onlineCount">1</span></span>
+                    <button class="btn-copy" onclick="copySessionId()" title="Copy Session ID">
+                        <i class="fas fa-copy"></i>
+                    </button>
                 </div>
             </div>
         </header>

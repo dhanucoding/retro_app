@@ -308,12 +308,25 @@ body {
     align-items: center;
 }
 
+.session-controls-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .session-input-group {
     display: flex;
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
     justify-content: center;
+}
+
+.session-input-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
 }
 
 .session-input {
@@ -327,10 +340,33 @@ body {
     min-width: 200px;
 }
 
+.session-input-compact {
+    padding: 6px 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    width: 120px;
+    min-width: 100px;
+}
+
 .session-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.session-input-compact:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.session-input-compact::placeholder {
+    font-size: 12px;
+    color: #a0aec0;
 }
 
 .btn-session {
@@ -349,7 +385,29 @@ body {
     color: white;
 }
 
+.btn-session-compact {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: inherit;
+    background: #667eea;
+    color: white;
+    white-space: nowrap;
+}
+
 .btn-session:hover {
+    background: #5a67d8;
+    transform: translateY(-1px);
+}
+
+.btn-session-compact:hover {
     background: #5a67d8;
     transform: translateY(-1px);
 }
@@ -365,6 +423,12 @@ body {
     font-size: 14px;
     font-weight: 500;
     color: #2d3748;
+    margin-top: 15px;
+    font-size: 13px;
+    padding: 8px 16px;
+    gap: 15px;
+    flex-direction: column;
+    text-align: center;
 }
 
 .session-status {
@@ -906,19 +970,37 @@ body {
         align-items: stretch;
     }
     
-    .session-input {
-        min-width: auto;
-        width: 100%;
-    }
-    
     .session-info {
         flex-direction: column;
         gap: 10px;
         text-align: center;
     }
     
-    .team-input {
+    /* Mobile styles for inline session controls */
+    .session-controls-inline {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .session-input-group-inline {
         flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .session-input-compact {
+        width: 100%;
+        min-width: auto;
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    .btn-session-compact {
+        width: 100%;
+        justify-content: center;
+        font-size: 13px;
+        padding: 8px 12px;
     }
 }
 

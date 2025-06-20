@@ -7,6 +7,14 @@
 ehthumbs.db
 Thumbs.db
 
+# Environment Variables
+.env
+
+# Firebase private key files
+firebase-adminsdk-*.json
+service-account-key.json
+firebase-config-local.js
+
 # VS Code settings (optional - you may want to include .vscode)
 # .vscode/
 
@@ -29,3 +37,6 @@ node_modules/
 
 # Optional REPL history
 .node_repl_history
+
+# Archive folder
+Archive/
