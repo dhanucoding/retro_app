@@ -16,15 +16,15 @@ const envConfig = isNode ? {
      appId: "__FIREBASE_APP_ID__"
 } : null;
 
-// Fallback configuration (move your actual keys to firebase-config-local.js)
+// Fallback configuration (for production, replaced by CI/CD)
 const fallbackConfig = {
-    apiKey: "your-api-key-here",
-    authDomain: "your-project.firebaseapp.com",
-    databaseURL: "https://your-project-default-rtdb.firebaseio.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "your-sender-id",
-    appId: "your-app-id"
+    apiKey: "__FIREBASE_API_KEY__",
+    authDomain: "__FIREBASE_AUTH_DOMAIN__",
+    databaseURL: "__FIREBASE_DATABASE_URL__",
+    projectId: "__FIREBASE_PROJECT_ID__",
+    storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+    messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+    appId: "__FIREBASE_APP_ID__"
 };
 
 // Try to load local config file (git-ignored)
@@ -39,7 +39,7 @@ try {
 }
 
 // Use environment config first, then local config, then fallback
-const firebaseConfig = envConfig || localConfig || fallbackConfig;
+const firebaseConfig =  localConfig || fallbackConfig;
 
 // Initialize Firebase (this will be called from script.js)
 function initializeFirebase() {
