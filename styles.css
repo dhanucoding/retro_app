@@ -1,4 +1,72 @@
 * {
+/* Login Overlay Styles */
+.login-overlay {
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+.login-modal {
+    background: #fff;
+    padding: 2.5rem 2rem 2rem 2rem;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    min-width: 320px;
+    max-width: 90vw;
+    text-align: center;
+}
+
+.login-modal h2 {
+    margin-bottom: 1.2rem;
+    color: #4a5568;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+#loginCodeInput {
+    width: 80%;
+    padding: 0.7rem;
+    font-size: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    outline: none;
+    transition: border 0.2s;
+}
+
+#loginCodeInput:focus {
+    border-color: #667eea;
+}
+
+#loginSubmitBtn {
+    padding: 0.6rem 1.5rem;
+    background: #667eea;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#loginSubmitBtn:hover {
+    background: #5a67d8;
+}
+
+.login-error {
+    margin-top: 0.7rem;
+    color: #e53e3e;
+    font-size: 0.98rem;
+}
     margin: 0;
     padding: 0;
     box-sizing: border-box;

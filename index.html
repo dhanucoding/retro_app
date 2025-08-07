@@ -11,20 +11,24 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- Always load local config first if on localhost -->
     <script>
-      // Only load local config if running on localhost
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        var script = document.createElement('script');
-        script.src = 'firebase-config-local.js';
-        script.onerror = function() {
-          console.log('Local config not found, using fallback');
-        };
-        document.head.appendChild(script);
+        document.write('<script src="firebase-config-local.js"><\/script>');
       }
     </script>
     <script src="firebase-config.js"></script>
 </head>
 <body>
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay" style="display:none;">
+        <div class="login-modal">
+            <h2>Enter Access Code</h2>
+            <input type="password" id="loginCodeInput" placeholder="Access code..." autocomplete="off" />
+            <button id="loginSubmitBtn">Enter</button>
+            <div id="loginError" class="login-error" style="color:red;display:none;"></div>
+        </div>
+    </div>
     <div class="container">
         <header class="header">
             <h1><i class="fas fa-sync-alt"></i> Sprint Retrospective</h1>
@@ -173,6 +177,7 @@
         </div>
     </div>
 
+    <!-- Place script.js here so overlay HTML is present before JS runs -->
     <script src="script.js"></script>
     <!-- Debug utilities for testing (can be removed in production) -->
     <script>

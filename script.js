@@ -66,35 +66,115 @@ let collaborationState = {
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
+    // Show login overlay and block app until code is validated
+    showLoginOverlay();
+});
+
+// Show login overlay and block app until correct code is entered
+function showLoginOverlay() {
+    const overlay = document.getElementById('loginOverlay');
+    const input = document.getElementById('loginCodeInput');
+    const submitBtn = document.getElementById('loginSubmitBtn');
+    const errorDiv = document.getElementById('loginError');
+    console.log('[LoginOverlay] showLoginOverlay called');
+    if (!overlay) {
+        console.error('[LoginOverlay] #loginOverlay not found in DOM');
+    } else {
+        overlay.style.display = 'flex';
+        console.log('[LoginOverlay] Set overlay display to flex');
+    }
+    if (!input) {
+        console.error('[LoginOverlay] #loginCodeInput not found in DOM');
+    } else {
+        input.value = '';
+        input.focus();
+    }
+    if (!errorDiv) {
+        console.error('[LoginOverlay] #loginError not found in DOM');
+    } else {
+        errorDiv.style.display = 'none';
+    }
+
+    // Fetch code from Firebase (at /loginCode)
+    let loginCode = null;
+    let db = null;
+    try {
+        db = initializeFirebase();
+        console.log('[LoginOverlay] Firebase initialized:', !!db);
+    } catch (e) {
+        console.error('[LoginOverlay] Error initializing Firebase:', e);
+    }
+    if (!db) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Could not connect to Firebase.';
+            errorDiv.style.display = 'block';
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+    db.ref('loginCode').once('value').then(snap => {
+        loginCode = (snap && snap.val()) ? String(snap.val()) : null;
+        //console.log('[LoginOverlay] loginCode fetched from Firebase:', loginCode);
+        if (!loginCode) {
+            if (errorDiv) {
+                errorDiv.textContent = 'No access code set. Please contact the admin.';
+                errorDiv.style.display = 'block';
+            }
+            if (submitBtn) submitBtn.disabled = true;
+        } else {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }).catch((err) => {
+        console.error('[LoginOverlay] Error fetching loginCode:', err);
+        if (errorDiv) {
+            errorDiv.textContent = 'Could not fetch access code.';
+            errorDiv.style.display = 'block';
+        }
+        if (submitBtn) submitBtn.disabled = true;
+    });
+
+    function tryLogin() {
+        if (!loginCode) return;
+        const entered = input.value.trim();
+        //console.log('[LoginOverlay] Try login with entered code:', entered);
+        if (entered === loginCode) {
+            overlay.style.display = 'none';
+            console.log('[LoginOverlay] Login success, hiding overlay');
+            // Proceed to app
+            afterLoginSuccess();
+        } else {
+            if (errorDiv) {
+                errorDiv.textContent = 'Incorrect code. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+            input.value = '';
+            input.focus();
+            console.warn('[LoginOverlay] Incorrect code entered');
+        }
+    }
+    if (submitBtn) submitBtn.onclick = tryLogin;
+    if (input) input.onkeydown = function(e) { if (e.key === 'Enter') tryLogin(); };
+}
+
+// Called after successful login
+function afterLoginSuccess() {
+    // Normal app init
     loadRetroData();
     updateAllCounts();
-    
-    // Set today's date as default
     document.getElementById('sprintDate').value = new Date().toISOString().split('T')[0];
-    
-    // Initialize timer
     initializeTimer();
-    
-    // Add event listeners for sprint info
     document.getElementById('sprintName').addEventListener('input', function() {
         retroData.sprintName = this.value;
         saveRetroData();
     });
-    
     document.getElementById('sprintDate').addEventListener('change', function() {
         retroData.sprintDate = this.value;
         saveRetroData();
     });
-    
-    // Add enter key support for inputs
     setupEnterKeySupport();
-    
-    // Add button event listeners as backup
     setupButtonEventListeners();
-    
-    // Initialize all add buttons as disabled
     initializeButtonStates();
-});
+}
 
 // Initialize all add button states
 function initializeButtonStates() {
@@ -1134,6 +1214,11 @@ function createSession() {
         showNotification('Collaboration not available - running offline', 'warning');
         return;
     }
+    // Show login overlay for every new session
+    showLoginOverlay();
+    // After login, user can proceed to create session (handled in afterLoginSuccess)
+    // The rest of this function will be called after login
+    // (You may want to move session creation logic into afterLoginSuccess if needed)
     
     // Check if user has existing data
     const hasExistingData = retroData.sprintName || 
