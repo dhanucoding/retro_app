@@ -38,8 +38,10 @@ try {
     // Local config not available, will use fallback
 }
 
-// Use environment config first, then local config, then fallback
-const firebaseConfig =  localConfig || fallbackConfig;
+// Use local config if available (localhost), otherwise fallback (production)
+const firebaseConfig = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') && localConfig
+    ? localConfig
+    : fallbackConfig;
 
 // Initialize Firebase (this will be called from script.js)
 function initializeFirebase() {
